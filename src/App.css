@@ -49,6 +49,35 @@
   letter-spacing: 0.05em;
 }
 
+.name-box {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 280px;
+  padding: 18px 22px;
+  border-radius: 14px;
+  background: rgba(10, 46, 26, 0.2);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  color: #0a2e1a;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.name-box input {
+  border: 2px solid #0a2e1a;
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.85);
+  color: #0a2e1a;
+  font: inherit;
+  font-weight: 500;
+}
+
+.name-box input:focus {
+  outline: 3px solid rgba(10, 46, 26, 0.25);
+}
+
 .sorry-section {
   display: flex;
   flex-direction: column;

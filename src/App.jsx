@@ -6,8 +6,10 @@ function App() {
   const [awaitingApology, setAwaitingApology] = useState(false)
   const [showForgiven, setShowForgiven] = useState(false)
   const [pressCount, setPressCount] = useState(0)
+  const [userName, setUserName] = useState('')
 
   const isDisabled = exploded || awaitingApology || showForgiven
+  const nameSuffix = userName.trim() ? `, ${userName.trim()}` : ''
 
   const handleClick = () => {
     setPressCount((count) => count + 1)
@@ -33,6 +35,15 @@ function App() {
       </div>
       <div className="container">
         <h1 className="demo-title">Vibe Code Demo</h1>
+        <label className="name-box">
+          <span>Your name</span>
+          <input
+            type="text"
+            value={userName}
+            onChange={(event) => setUserName(event.target.value)}
+            placeholder="Enter your name"
+          />
+        </label>
         <button
           className={`exploding-button ${exploded ? 'explode' : ''}`}
           onClick={handleClick}
@@ -42,14 +53,14 @@ function App() {
         </button>
         {awaitingApology && (
           <div className="sorry-section">
-            <p className="sorry-text">Are you sorry</p>
+            <p className="sorry-text">Are you sorry{nameSuffix}</p>
             <button type="button" className="sorry-button" onClick={handleSorry}>
-              Yes, I'm very sorry
+              Yes, I'm very sorry{nameSuffix}
             </button>
           </div>
         )}
         {showForgiven && (
-          <p className="forgiven-text">ok, then</p>
+          <p className="forgiven-text">ok, then{nameSuffix}</p>
         )}
         {exploded && (
           <div className="explosion">
