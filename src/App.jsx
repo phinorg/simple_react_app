@@ -5,10 +5,12 @@ function App() {
   const [exploded, setExploded] = useState(false)
   const [awaitingApology, setAwaitingApology] = useState(false)
   const [showForgiven, setShowForgiven] = useState(false)
+  const [pressCount, setPressCount] = useState(0)
 
   const isDisabled = exploded || awaitingApology || showForgiven
 
   const handleClick = () => {
+    setPressCount((count) => count + 1)
     setExploded(true)
     setTimeout(() => {
       setExploded(false)
@@ -26,6 +28,9 @@ function App() {
 
   return (
     <div className="app">
+      <div className="press-counter" aria-label={`Button pressed ${pressCount} times`}>
+        {pressCount}
+      </div>
       <div className="container">
         <h1 className="demo-title">Vibe Code Demo</h1>
         <button
