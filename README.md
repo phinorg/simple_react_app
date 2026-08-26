@@ -33,7 +33,9 @@ Without `npm run server` the app still works, but the stats page reports
    http://localhost:5173)
 
 Press counts are stored in `data/stats.json`, which is gitignored and created
-on first press. Delete it (or use the Clear Stats button) to reset the league.
+on first press. Delete it to reset the league, or set `ADMIN_TOKEN` (api) and
+`VITE_ADMIN_TOKEN` (web, build-time) to matching values to enable the Clear
+Stats button — see Configuration below.
 
 ## Running in containers
 
@@ -78,6 +80,8 @@ are pure JavaScript).
 | --- | --- | --- | --- |
 | `API_UPSTREAM` | web | `http://api:3001` | Where nginx forwards `/api/*`; rendered into the config at container start |
 | `PORT` | api | `3001` | Port the Express server listens on |
+| `ADMIN_TOKEN` | api | unset | Shared secret required (as an `x-admin-token` header) to call `POST /api/stats/clear`. Unset disables the endpoint (503). |
+| `VITE_ADMIN_TOKEN` | web (build-time) | unset | Baked into the SPA bundle at `npm run build` / image build time so the Clear Stats button can send `ADMIN_TOKEN` above. Must match the api service's `ADMIN_TOKEN`. Unset hides the Clear Stats button. Note: because this is a client-bundled value, it is visible to anyone who views the page source — treat it as a demo-grade shared secret, not a real credential, for any public deployment. |
 
 nginx resolves the upstream per request, so the web container starts and serves
 the SPA even when the API is down (`/api/*` returns 502 until it is back).
