@@ -6,7 +6,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "server": "node server.js"
+    "server": "node server.js",
+    "vendor:api": "mkdir -p vendor && cp package.json package-lock.json vendor/ && npm ci --omit=dev --prefix vendor"
   },
   "dependencies": {
     "cors": "^2.8.5",

@@ -1,0 +1,17 @@
+node_modules
+# dist/ and vendor/ are kept in context for the `prebuilt` build stages.
+dist-ssr
+data
+.git
+.gitignore
+.cursor
+.vscode
+.idea
+.DS_Store
+*.log
+npm-debug.log*
+*.local
+Dockerfile
+Dockerfile.api
+docker-compose.yml
+README.md
