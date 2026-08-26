@@ -1,0 +1,51 @@
+# syntax=docker/dockerfile:1
+
+# Express stats API that backs /api/* behind nginx.
+#
+# Which stage supplies node_modules:
+#   source   (default) — npm ci --omit=dev inside the image (self-contained)
+#   prebuilt            — copy ./vendor/node_modules (`npm run vendor:api`)
+ARG DEPS_SOURCE=source
+
+# ---- Install production dependencies inside the image -------------------
+FROM node:22-bookworm-slim AS source
+
+WORKDIR /app
+
+# See Dockerfile for why registry credentials are mounted as a secret:
+#   docker build --secret id=npmrc,src=$HOME/.npmrc -f Dockerfile.api .
+COPY package.json package-lock.json ./
+RUN --mount=type=secret,id=npmrc,target=/root/.npmrc \
+    npm ci --omit=dev && npm cache clean --force
+
+# ---- Or take a dependency tree installed on the host --------------------
+FROM busybox:stable AS prebuilt
+
+WORKDIR /app
+COPY vendor/node_modules ./node_modules
+
+# ---- Resolve whichever dependency stage was selected --------------------
+FROM ${DEPS_SOURCE} AS deps
+
+# ---- Runtime ------------------------------------------------------------
+FROM node:22-bookworm-slim
+
+ENV NODE_ENV=production
+ENV PORT=3001
+
+WORKDIR /app
+
+COPY --from=deps /app/node_modules ./node_modules
+COPY server.js ./
+
+# stats.json lives here; mount a volume over it to persist across restarts.
+RUN mkdir -p /app/data && chown -R node:node /app/data
+
+USER node
+
+EXPOSE 3001
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD ["node", "-e", "fetch('http://127.0.0.1:'+process.env.PORT+'/api/stats').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+
+CMD ["node", "server.js"]

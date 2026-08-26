@@ -1,0 +1,38 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # `prebuilt` uses ./dist from `npm run build` instead of building
+        # inside the image — needed where the registry isn't reachable.
+        DIST_SOURCE: ${DIST_SOURCE:-source}
+    image: simple-react-app-web
+    ports:
+      - "8080:80"
+    environment:
+      # Where nginx forwards /api/* — override to point at another backend.
+      API_UPSTREAM: http://api:3001
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+      args:
+        # `prebuilt` uses ./vendor/node_modules from `npm run vendor:api`.
+        DEPS_SOURCE: ${DEPS_SOURCE:-source}
+    image: simple-react-app-api
+    environment:
+      PORT: "3001"
+    volumes:
+      # Keeps data/stats.json across container restarts.
+      - stats-data:/app/data
+    expose:
+      - "3001"
+    restart: unless-stopped
+
+volumes:
+  stats-data:
