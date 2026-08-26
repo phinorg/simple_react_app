@@ -1,24 +1,39 @@
 # Exploding Button React App
 
-A React app featuring a red button that explodes when clicked!
+A React app featuring a red button that explodes when clicked — plus a stats
+API that keeps a leaderboard of who pressed it most.
 
-## Getting Started 
+## Getting Started
 
-1. Change directory to your application home: 
+1. Change directory to your application home:
 
-`cd <path to repo>/exercises/04_mcp_server`
-
-1. Install dependencies:
 ```bash
-npm install 
+cd <path to repo>/simple_react_app
 ```
 
-2. Start the development server:
+2. Install dependencies:
+
 ```bash
-npm run dev
+npm install
 ```
 
-3. Open your browser and navigate to the URL shown in the terminal (usually http://localhost:5173)
+3. Start the two dev processes in separate terminals — the Vite dev server and
+   the Express stats API. The dev server proxies `/api/*` to the API on port
+   3001, so the Button League page needs both running:
+
+```bash
+npm run dev     # http://localhost:5173
+npm run server  # http://localhost:3001
+```
+
+Without `npm run server` the app still works, but the stats page reports
+"Unable to load stats" and presses aren't recorded.
+
+4. Open your browser and navigate to the URL shown in the terminal (usually
+   http://localhost:5173)
+
+Press counts are stored in `data/stats.json`, which is gitignored and created
+on first press. Delete it (or use the Clear Stats button) to reset the league.
 
 ## Running in containers
 
@@ -71,10 +86,10 @@ readiness.
 
 ## Features
 
-- Red button labeled "fo not pish"
-- Explosion animation with particles when clicked
-- Smooth animations and transitions
+- Red button labeled "DO NOT PUSH. NEVER, EVER. OR ELSE!" that explodes on click
+- Explosion animation with particles, followed by an apology prompt
+- Optional name field, woven into the apology and forgiveness messages
+- Live press counter in the corner of the page
+- Button League stats page ranking players by press count, backed by the
+  Express API and persisted to disk
 - Modern, responsive design
-
-
-
