@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import './App.css'
 
+const adminToken = import.meta.env.VITE_ADMIN_TOKEN
+
 function App() {
   const [exploded, setExploded] = useState(false)
   const [awaitingApology, setAwaitingApology] = useState(false)
@@ -87,6 +89,9 @@ function App() {
     try {
       const response = await fetch('/api/stats/clear', {
         method: 'POST',
+        headers: {
+          'x-admin-token': adminToken || '',
+        },
       })
 
       if (!response.ok) {
@@ -193,9 +198,15 @@ function App() {
           <p className="stats-empty">No button presses recorded yet.</p>
         )}
       </div>
-      <button type="button" className="clear-stats-button" onClick={handleClearStats}>
-        Clear Stats
-      </button>
+      {adminToken ? (
+        <button type="button" className="clear-stats-button" onClick={handleClearStats}>
+          Clear Stats
+        </button>
+      ) : (
+        <p className="stats-empty">
+          Clearing stats requires an operator to configure VITE_ADMIN_TOKEN.
+        </p>
+      )}
     </div>
   )
 

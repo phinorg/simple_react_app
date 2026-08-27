@@ -11,12 +11,35 @@ const statsPath = path.join(dataDir, 'stats.json')
 
 const app = express()
 const port = process.env.PORT || 3001
+const adminToken = process.env.ADMIN_TOKEN
 
 app.use(cors())
 app.use(express.json())
 
+function requireAdminToken(request, response, next) {
+  if (!adminToken) {
+    return response.status(503).json({ error: 'admin action disabled: ADMIN_TOKEN is not configured' })
+  }
+
+  if (request.get('x-admin-token') !== adminToken) {
+    return response.status(403).json({ error: 'forbidden' })
+  }
+
+  next()
+}
+
 function createEmptyStats() {
-  return { players: {} }
+  return { players: Object.create(null) }
+}
+
+function toSafePlayers(players) {
+  const safePlayers = Object.create(null)
+
+  for (const [name, presses] of Object.entries(players || {})) {
+    safePlayers[name] = presses
+  }
+
+  return safePlayers
 }
 
 function ensureStatsFile() {
@@ -34,7 +57,9 @@ function readStats() {
 
   try {
     const stats = JSON.parse(fs.readFileSync(statsPath, 'utf8'))
-    return stats.players && typeof stats.players === 'object' ? stats : createEmptyStats()
+    return stats.players && typeof stats.players === 'object'
+      ? { players: toSafePlayers(stats.players) }
+      : createEmptyStats()
   } catch {
     return createEmptyStats()
   }
@@ -70,7 +95,7 @@ app.post('/api/stats/press', (request, response) => {
   response.status(201).json({ players: toLeagueTable(stats) })
 })
 
-app.post('/api/stats/clear', (_request, response) => {
+app.post('/api/stats/clear', requireAdminToken, (_request, response) => {
   writeStats(createEmptyStats())
   response.json({ players: [] })
 })
