@@ -75,14 +75,57 @@ function normalizeName(name) {
   return trimmedName || 'Anonymous'
 }
 
+// Badges are derived from the press count rather than stored, so they stay
+// correct no matter how stats.json was last written — and "Pristine" is lost
+// the instant the count leaves zero, with no separate revocation step.
+const BADGES = [
+  {
+    id: 'pristine',
+    label: 'Pristine',
+    icon: '🕊️',
+    description: 'Never pressed the button. Lost forever on the first press.',
+    earned: (presses) => presses === 0,
+  },
+  {
+    id: 'spoon',
+    label: 'Spoon',
+    icon: '🥄',
+    description: 'Pressed the button five times. You were warned.',
+    earned: (presses) => presses >= 5,
+  },
+]
+
+function toBadges(presses) {
+  return BADGES.filter((badge) => badge.earned(presses)).map(({ id, label, icon, description }) => ({
+    id,
+    label,
+    icon,
+    description,
+  }))
+}
+
 function toLeagueTable(stats) {
   return Object.entries(stats.players)
-    .map(([name, presses]) => ({ name, presses }))
+    .map(([name, presses]) => ({ name, presses, badges: toBadges(presses) }))
     .sort((left, right) => right.presses - left.presses || left.name.localeCompare(right.name))
 }
 
 app.get('/api/stats', (_request, response) => {
   response.json({ players: toLeagueTable(readStats()) })
+})
+
+// Claims a name at zero presses so the Pristine badge can be held and seen
+// before it is lost. Never resets an existing player's count.
+app.post('/api/stats/register', (request, response) => {
+  const name = normalizeName(request.body?.name)
+  const stats = readStats()
+
+  if (!(name in stats.players)) {
+    stats.players[name] = 0
+    writeStats(stats)
+  }
+
+  response.status(201).json({ players: toLeagueTable(stats) })
 })
 
 app.post('/api/stats/press', (request, response) => {
