@@ -16,6 +16,35 @@ function App() {
 
   const isDisabled = exploded || awaitingApology || showForgiven
   const nameSuffix = userName.trim() ? `, ${userName.trim()}` : ''
+  const trimmedName = userName.trim()
+  const myBadges = stats.find((player) => player.name === trimmedName)?.badges || []
+
+  // Claims the name at zero presses so the Pristine badge is visible before
+  // it is lost, rather than only existing in the instant it is taken away.
+  const registerName = async () => {
+    if (!trimmedName) {
+      return
+    }
+
+    try {
+      const response = await fetch('/api/stats/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ name: trimmedName }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Unable to claim your name')
+      }
+
+      const data = await response.json()
+      setStats(data.players || [])
+    } catch (error) {
+      setStatsError(error.message)
+    }
+  }
 
   const fetchStats = async () => {
     setStatsLoading(true)
@@ -116,8 +145,22 @@ function App() {
           value={userName}
           onChange={(event) => setUserName(event.target.value)}
           placeholder="Enter your name"
+          onBlur={registerName}
         />
       </label>
+      <div className="badge-shelf" aria-live="polite">
+        {myBadges.length > 0 ? (
+          myBadges.map((badge) => (
+            <span key={badge.id} className={`badge badge-${badge.id}`} title={badge.description}>
+              <span aria-hidden="true">{badge.icon}</span> {badge.label}
+            </span>
+          ))
+        ) : (
+          <span className="badge-empty">
+            {trimmedName ? 'No badges. The Pristine one is already gone.' : 'Enter your name to claim a badge.'}
+          </span>
+        )}
+      </div>
       <button
         className={`exploding-button ${exploded ? 'explode' : ''}`}
         onClick={handleClick}
@@ -182,6 +225,7 @@ function App() {
                 <th>Rank</th>
                 <th>Name</th>
                 <th>Presses</th>
+                <th>Badges</th>
               </tr>
             </thead>
             <tbody>
@@ -190,6 +234,17 @@ function App() {
                   <td>{index + 1}</td>
                   <td>{player.name}</td>
                   <td>{player.presses}</td>
+                  <td className="badge-cell">
+                    {(player.badges || []).map((badge) => (
+                      <span
+                        key={badge.id}
+                        className={`badge badge-${badge.id}`}
+                        title={badge.description}
+                      >
+                        <span aria-hidden="true">{badge.icon}</span> {badge.label}
+                      </span>
+                    ))}
+                  </td>
                 </tr>
               ))}
             </tbody>

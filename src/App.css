@@ -888,3 +888,51 @@
   }
 }
 
+
+.badge-shelf {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  min-height: 34px;
+  margin-bottom: 8px;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.85);
+  color: #0a2e1a;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 0.95rem;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: help;
+}
+
+.badge-pristine {
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: inset 0 0 0 2px rgba(10, 46, 26, 0.35);
+}
+
+.badge-spoon {
+  background: #f6c445;
+  box-shadow: inset 0 0 0 2px rgba(10, 46, 26, 0.35);
+}
+
+.badge-empty {
+  color: rgba(10, 46, 26, 0.7);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 0.95rem;
+  font-style: italic;
+}
+
+.badge-cell {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
