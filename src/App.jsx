@@ -1,7 +1,24 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import './App.css'
 
 const adminToken = import.meta.env.VITE_ADMIN_TOKEN
+
+// The button flees the cursor -- but only so many times. If it could dodge
+// forever the press counter and the Button League would be unwinnable, so it
+// runs out of nerve after MAX_DODGES and stands still to be pushed.
+const MAX_DODGES = 6
+const FLEE_RADIUS = 140
+const FLEE_STRENGTH = 0.9
+const VIEWPORT_MARGIN = 12
+
+const TAUNTS = [
+  'Nope.',
+  'Not today.',
+  "You'll never catch me.",
+  'Missed. Embarrassing, really.',
+  '...ok, you are weirdly persistent.',
+  'Fine. FINE. Push it. See what happens.',
+]
 
 function App() {
   const [exploded, setExploded] = useState(false)
@@ -13,8 +30,93 @@ function App() {
   const [stats, setStats] = useState([])
   const [statsLoading, setStatsLoading] = useState(false)
   const [statsError, setStatsError] = useState('')
+  const [dodge, setDodge] = useState({ x: 0, y: 0 })
+  const [dodgeCount, setDodgeCount] = useState(0)
+
+  const dodgeRef = useRef({ x: 0, y: 0 })
+  const wrapRef = useRef(null)
+  const wasNearRef = useRef(false)
 
   const isDisabled = exploded || awaitingApology || showForgiven
+  const exhausted = dodgeCount >= MAX_DODGES
+
+  const resetDodge = useCallback(() => {
+    dodgeRef.current = { x: 0, y: 0 }
+    wasNearRef.current = false
+    setDodge({ x: 0, y: 0 })
+    setDodgeCount(0)
+  }, [])
+
+  // Mouse-only evasion: keyboard users tab to the button and press Enter, and
+  // touch devices never fire mousemove, so both reach it without a fight.
+  useEffect(() => {
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+    if (reduceMotion || isDisabled || exhausted) {
+      return undefined
+    }
+
+    const handleMouseMove = (event) => {
+      const wrap = wrapRef.current
+
+      if (!wrap) {
+        return
+      }
+
+      const rect = wrap.getBoundingClientRect()
+      const centerX = rect.left + rect.width / 2
+      const centerY = rect.top + rect.height / 2
+      const dx = centerX - event.clientX
+      const dy = centerY - event.clientY
+      const distance = Math.hypot(dx, dy)
+
+      if (distance > FLEE_RADIUS) {
+        wasNearRef.current = false
+        return
+      }
+
+      // Count one dodge per approach, not one per mousemove event.
+      if (!wasNearRef.current) {
+        wasNearRef.current = true
+        setDodgeCount((count) => count + 1)
+      }
+
+      // Straight-up approach gives a zero vector; nudge it sideways instead.
+      const angle = distance < 1 ? Math.random() * Math.PI * 2 : Math.atan2(dy, dx)
+      const push = (FLEE_RADIUS - distance) * FLEE_STRENGTH
+      const current = dodgeRef.current
+
+      // Clamp against the button's untranslated position so it cannot be
+      // herded off the edge of the viewport.
+      const baseLeft = rect.left - current.x
+      const baseTop = rect.top - current.y
+      const minX = VIEWPORT_MARGIN - baseLeft
+      const maxX = window.innerWidth - rect.width - VIEWPORT_MARGIN - baseLeft
+      const minY = VIEWPORT_MARGIN - baseTop
+      const maxY = window.innerHeight - rect.height - VIEWPORT_MARGIN - baseTop
+
+      const next = {
+        x: Math.min(Math.max(current.x + Math.cos(angle) * push, minX), maxX),
+        y: Math.min(Math.max(current.y + Math.sin(angle) * push, minY), maxY),
+      }
+
+      dodgeRef.current = next
+      setDodge(next)
+    }
+
+    window.addEventListener('mousemove', handleMouseMove)
+
+    return () => window.removeEventListener('mousemove', handleMouseMove)
+  }, [isDisabled, exhausted])
+
+  // Once it gives up, it slinks back to where it started.
+  useEffect(() => {
+    if (exhausted) {
+      dodgeRef.current = { x: 0, y: 0 }
+      setDodge({ x: 0, y: 0 })
+    }
+  }, [exhausted])
+
   const nameSuffix = userName.trim() ? `, ${userName.trim()}` : ''
   const trimmedName = userName.trim()
   const myBadges = stats.find((player) => player.name === trimmedName)?.badges || []
@@ -96,6 +198,7 @@ function App() {
   const handleClick = () => {
     setPressCount((count) => count + 1)
     recordButtonPress()
+    resetDodge()
     setExploded(true)
     setTimeout(() => {
       setExploded(false)
@@ -161,13 +264,22 @@ function App() {
           </span>
         )}
       </div>
-      <button
-        className={`exploding-button ${exploded ? 'explode' : ''}`}
-        onClick={handleClick}
-        disabled={isDisabled}
+      <div
+        className={`button-dodge-wrap ${exhausted ? 'exhausted' : ''}`}
+        ref={wrapRef}
+        style={{ transform: `translate(${dodge.x}px, ${dodge.y}px)` }}
       >
-        DO NOT PUSH. NEVER, EVER. OR ELSE!
-      </button>
+        <button
+          className={`exploding-button ${exploded ? 'explode' : ''}`}
+          onClick={handleClick}
+          disabled={isDisabled}
+        >
+          DO NOT PUSH. NEVER, EVER. OR ELSE!
+        </button>
+      </div>
+      <p className="taunt" aria-live="polite">
+        {dodgeCount > 0 && !isDisabled ? TAUNTS[Math.min(dodgeCount, TAUNTS.length) - 1] : '\u00a0'}
+      </p>
       {awaitingApology && (
         <div className="sorry-section">
           <p className="sorry-text">Are you sorry{nameSuffix}</p>
