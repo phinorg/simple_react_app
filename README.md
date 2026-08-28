@@ -97,3 +97,7 @@ readiness.
 - Button League stats page ranking players by press count, backed by the
   Express API and persisted to disk
 - Modern, responsive design
+
+## Todo
+
+Various security fixes
