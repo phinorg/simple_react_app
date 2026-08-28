@@ -30,6 +30,8 @@ jobs:
         namespace: 'pmm-robert-haynes' # Replace with your Endor Labs tenant namespace
         scan_dependencies: true
         scan_secrets: true
+        scan_sast: true
+        additional_args: --ai-sast
         pr: true
         enable_pr_comments: true # Required to automatically comment on PRs for new policy violations
         github_token: ${{ secrets.GITHUB_TOKEN }} # Required for PR comments on new policy violations
@@ -62,9 +64,8 @@ jobs:
         scan_dependencies: true
         scan_secrets: true
         pr: false
+        scan_sast: true
+        additional_args: --ai-sast
         scan_summary_output_type: 'table'
-        sarif_file: 'findings.sarif'
-    - name: Upload findings to github
-      uses: github/codeql-action/upload-sarif@v3
-      with:
-        sarif_file: 'findings.sarif'
+      
+   
