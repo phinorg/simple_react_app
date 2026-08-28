@@ -1,0 +1,68 @@
+name: Endor Labs Dependency and Secrets Scan
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+jobs:
+  scan:
+    permissions:
+      security-events: write # Used to upload Sarif artifact to GitHub
+      contents: read # Used to check out a private repository
+      actions: read # Required for private repositories to upload Sarif files. GitHub Advanced Security licenses are required.
+      id-token: write # Used for keyless authentication with Endor Labs
+      pull-requests: write # Required to automatically comment on PRs for new policy violations
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v3
+    - name: Setup Java
+      uses: actions/setup-java@v3
+      with:
+        distribution: 'microsoft'
+        java-version: '17'
+    - name: Build Package
+      run: mvn clean install
+    - name: Endor Labs Scan Pull Request
+      if: github.event_name == 'pull_request'
+      uses: endorlabs/github-action@b8992820cc4d9c9e7ded5022adf6cabe2dc11946 # v1.1.12
+      with:
+        namespace: 'example' # Replace with your Endor Labs tenant namespace
+        scan_dependencies: true
+        scan_secrets: true
+        pr: true
+        enable_pr_comments: true # Required to automatically comment on PRs for new policy violations
+        github_token: ${{ secrets.GITHUB_TOKEN }} # Required for PR comments on new policy violations
+
+  scan-main:
+    permissions:
+      id-token: write
+      repository-projects: read
+      pull-requests: read
+      contents: read
+    name: endorctl-scan
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v3
+    - name: Setup Java
+      uses: actions/setup-java@v3
+      with:
+        distribution: 'microsoft'
+        java-version: '17'
+    - name: Build Package
+      run: mvn clean install
+    - name: 'Endor Labs Scan Push to main'
+      if: ${{ github.event_name == 'push' }}
+      uses: endorlabs/github-action@b8992820cc4d9c9e7ded5022adf6cabe2dc11946 # v1.1.12
+      with:
+        namespace: 'example' # Replace with your Endor Labs tenant namespace
+        scan_dependencies: true
+        scan_secrets: true
+        pr: false
+        scan_summary_output_type: 'table'
+        sarif_file: 'findings.sarif'
+    - name: Upload findings to github
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: 'findings.sarif'
