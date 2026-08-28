@@ -40,6 +40,8 @@ jobs:
       repository-projects: read
       pull-requests: read
       contents: read
+      actions: read # Required for private repositories to upload Sarif files. GitHub Advanced Security licenses are required.
+      security-events: write # Used to upload Sarif artifact to GitHub
     name: endorctl-scan
     runs-on: ubuntu-latest
     steps:
@@ -51,7 +53,7 @@ jobs:
         distribution: 'microsoft'
         java-version: '17'
     - name: Build Package
-      run: npm install --no-package-lock
+      run: npm install --no-package-lock # added --no-package-lock modifier to fix package firewall issue
     - name: 'Endor Labs Scan Push to main'
       if: ${{ github.event_name == 'push' }}
       uses: endorlabs/github-action@b8992820cc4d9c9e7ded5022adf6cabe2dc11946 # v1.1.12
