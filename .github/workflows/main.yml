@@ -31,7 +31,7 @@ jobs:
         scan_dependencies: true
         scan_secrets: true
         scan_sast: true
-        additional_args: --ai-sast
+        additional_args: --ai-sast --pr-incremental
         pr: true
         enable_pr_comments: true # Required to automatically comment on PRs for new policy violations
         github_token: ${{ secrets.GITHUB_TOKEN }} # Required for PR comments on new policy violations
