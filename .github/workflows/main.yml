@@ -37,6 +37,7 @@ jobs:
         github_token: ${{ secrets.GITHUB_TOKEN }} # Required for PR comments on new policy violations
 
   scan-main:
+    if: github.event_name == 'push'
     permissions:
       id-token: write
       repository-projects: read
@@ -57,7 +58,6 @@ jobs:
     - name: Build Package
       run: npm install --no-package-lock # added --no-package-lock modifier to fix package firewall issue
     - name: 'Endor Labs Scan Push to main'
-      if: ${{ github.event_name == 'push' }}
       uses: endorlabs/github-action@b8992820cc4d9c9e7ded5022adf6cabe2dc11946 # v1.1.12
       with:
         namespace: 'pmm-robert-haynes' # Replace with your Endor Labs tenant namespace
