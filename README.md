@@ -37,6 +37,35 @@ on first press. Delete it to reset the league, or set `ADMIN_TOKEN` (api) and
 `VITE_ADMIN_TOKEN` (web, build-time) to matching values to enable the Clear
 Stats button — see Configuration below.
 
+## Accounts
+
+Sign up from the nav to claim a name for the Button League. Presses are
+attributed to whoever the session token identifies, so signed-out players score
+as `Anonymous` and nobody can post a press under a name they do not hold.
+
+The account store lives on the API, not in the browser:
+
+- `data/users.json` holds `username -> {salt, hash, createdAt}`, written with
+  the same atomic temp-file/fsync/rename path as `stats.json`, at mode `0600`.
+  It is gitignored.
+- Passwords are hashed with PBKDF2-HMAC-SHA512, 210,000 iterations, 16-byte
+  per-account salt, using Node's built-in `crypto` -- no added dependency. The
+  browser never hashes or stores a password.
+- `POST /api/auth/signup` and `POST /api/auth/login` return a session token.
+  The client keeps only that token, and sends it as `Authorization: Bearer`.
+- `POST /api/stats/press` and `POST /api/stats/register` take the username from
+  the token. Neither reads a name from the request body.
+
+Known limits:
+
+- **Sessions are in-memory**, so restarting the API signs everyone out.
+  Accounts themselves persist; you just log in again.
+- **No transport security of its own.** Tokens over plain http are sniffable;
+  put it behind https for anything real.
+- **No login rate limiting.** Password guessing is only slowed by the PBKDF2
+  cost.
+- Deleting `data/users.json` deletes every account.
+
 ## Running in containers
 
 Two images: `web` (the `nginx:mainline` Debian image serving the built SPA and

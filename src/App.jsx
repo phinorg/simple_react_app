@@ -1,5 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import './App.css'
+import {
+  MIN_PASSWORD_LENGTH,
+  authHeaders,
+  restoreSession,
+  signIn,
+  signOut,
+  signUp,
+} from './auth'
 
 const adminToken = import.meta.env.VITE_ADMIN_TOKEN
 
@@ -25,13 +33,16 @@ function App() {
   const [awaitingApology, setAwaitingApology] = useState(false)
   const [showForgiven, setShowForgiven] = useState(false)
   const [pressCount, setPressCount] = useState(0)
-  const [userName, setUserName] = useState('')
   const [page, setPage] = useState('home')
   const [stats, setStats] = useState([])
   const [statsLoading, setStatsLoading] = useState(false)
   const [statsError, setStatsError] = useState('')
   const [dodge, setDodge] = useState({ x: 0, y: 0 })
   const [dodgeCount, setDodgeCount] = useState(0)
+  const [account, setAccount] = useState('')
+  const [authForm, setAuthForm] = useState({ username: '', password: '', confirm: '' })
+  const [authError, setAuthError] = useState('')
+  const [authBusy, setAuthBusy] = useState(false)
 
   const dodgeRef = useRef({ x: 0, y: 0 })
   const wrapRef = useRef(null)
@@ -117,24 +128,17 @@ function App() {
     }
   }, [exhausted])
 
-  const nameSuffix = userName.trim() ? `, ${userName.trim()}` : ''
-  const trimmedName = userName.trim()
-  const myBadges = stats.find((player) => player.name === trimmedName)?.badges || []
+  const nameSuffix = account ? `, ${account}` : ''
+  const myBadges = stats.find((player) => player.name === account)?.badges || []
 
-  // Claims the name at zero presses so the Pristine badge is visible before
-  // it is lost, rather than only existing in the instant it is taken away.
+  // Claims the caller's row at zero presses so the Pristine badge is visible
+  // before it is lost. Signup does this too; this covers a session whose row
+  // predates it. The server takes the name from the token, so nothing is sent.
   const registerName = async () => {
-    if (!trimmedName) {
-      return
-    }
-
     try {
       const response = await fetch('/api/stats/register', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ name: trimmedName }),
+        headers: authHeaders(),
       })
 
       if (!response.ok) {
@@ -174,14 +178,13 @@ function App() {
     }
   }, [page])
 
+  // No name is sent: the API attributes the press to the session token, or to
+  // Anonymous when there is none.
   const recordButtonPress = async () => {
     try {
       const response = await fetch('/api/stats/press', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ name: userName }),
+        headers: authHeaders(),
       })
 
       if (!response.ok) {
@@ -238,19 +241,167 @@ function App() {
     }
   }
 
+  // A stored token can outlive the server session it names, so ask the API
+  // whether it is still good rather than trusting it on sight.
+  useEffect(() => {
+    let cancelled = false
+
+    restoreSession().then((name) => {
+      if (!cancelled && name) {
+        setAccount(name)
+      }
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const resetAuthForm = () => {
+    setAuthForm({ username: '', password: '', confirm: '' })
+    setAuthError('')
+  }
+
+  const updateAuthField = (field) => (event) => {
+    setAuthForm((form) => ({ ...form, [field]: event.target.value }))
+  }
+
+  useEffect(() => {
+    if (account) {
+      registerName()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [account])
+
+  const goToPage = (nextPage) => {
+    resetAuthForm()
+    setPage(nextPage)
+  }
+
+  const handleSignUp = async (event) => {
+    event.preventDefault()
+
+    if (authForm.password !== authForm.confirm) {
+      setAuthError('Those passwords do not match.')
+      return
+    }
+
+    setAuthBusy(true)
+    setAuthError('')
+
+    try {
+      const name = await signUp(authForm.username, authForm.password)
+      setAccount(name)
+      resetAuthForm()
+      setPage('home')
+    } catch (error) {
+      setAuthError(error.message)
+    } finally {
+      setAuthBusy(false)
+    }
+  }
+
+  const handleLogIn = async (event) => {
+    event.preventDefault()
+    setAuthBusy(true)
+    setAuthError('')
+
+    try {
+      const name = await signIn(authForm.username, authForm.password)
+      setAccount(name)
+      resetAuthForm()
+      setPage('home')
+    } catch (error) {
+      setAuthError(error.message)
+    } finally {
+      setAuthBusy(false)
+    }
+  }
+
+  const handleLogOut = async () => {
+    await signOut()
+    setAccount('')
+    setPage('home')
+  }
+
+  const renderAuthPage = (mode) => {
+    const isSignUp = mode === 'signup'
+
+    return (
+      <div className="auth-page">
+        <h1 className="demo-title">{isSignUp ? 'Sign Up' : 'Log In'}</h1>
+        <form className="auth-card" onSubmit={isSignUp ? handleSignUp : handleLogIn}>
+          <label className="auth-field">
+            <span>Username</span>
+            <input
+              type="text"
+              value={authForm.username}
+              onChange={updateAuthField('username')}
+              autoComplete="username"
+              placeholder="Pick a name for the league"
+              required
+            />
+          </label>
+          <label className="auth-field">
+            <span>Password</span>
+            <input
+              type="password"
+              value={authForm.password}
+              onChange={updateAuthField('password')}
+              autoComplete={isSignUp ? 'new-password' : 'current-password'}
+              placeholder={isSignUp ? `At least ${MIN_PASSWORD_LENGTH} characters` : 'Your password'}
+              required
+            />
+          </label>
+          {isSignUp && (
+            <label className="auth-field">
+              <span>Confirm password</span>
+              <input
+                type="password"
+                value={authForm.confirm}
+                onChange={updateAuthField('confirm')}
+                autoComplete="new-password"
+                placeholder="Type it again"
+                required
+              />
+            </label>
+          )}
+          {authError && <p className="auth-error" role="alert">{authError}</p>}
+          <button type="submit" className="auth-submit" disabled={authBusy}>
+            {authBusy ? 'Working...' : isSignUp ? 'Create account' : 'Log in'}
+          </button>
+          <p className="auth-switch">
+            {isSignUp ? 'Already have an account? ' : 'Need an account? '}
+            <button type="button" onClick={() => goToPage(isSignUp ? 'login' : 'signup')}>
+              {isSignUp ? 'Log in' : 'Sign up'}
+            </button>
+          </p>
+          <p className="auth-disclaimer">
+            Accounts are stored in this browser only. They are not real security, they do not
+            follow you to another device, and clearing site data deletes them.
+          </p>
+        </form>
+      </div>
+    )
+  }
+
   const renderHomePage = () => (
     <div className="container">
       <h1 className="demo-title">Vibe Code Demo</h1>
-      <label className="name-box">
-        <span>Your name</span>
-        <input
-          type="text"
-          value={userName}
-          onChange={(event) => setUserName(event.target.value)}
-          placeholder="Enter your name"
-          onBlur={registerName}
-        />
-      </label>
+      {account ? (
+        <div className="name-box name-box-locked">
+          <span>Playing as</span>
+          <strong className="account-name">{account}</strong>
+        </div>
+      ) : (
+        <div className="name-box name-box-locked">
+          <span>Playing as</span>
+          <strong className="account-name">Anonymous</strong>
+          <button type="button" className="name-box-cta" onClick={() => goToPage('signup')}>
+            Sign up to claim your presses
+          </button>
+        </div>
+      )}
       <div className="badge-shelf" aria-live="polite">
         {myBadges.length > 0 ? (
           myBadges.map((badge) => (
@@ -260,7 +411,7 @@ function App() {
           ))
         ) : (
           <span className="badge-empty">
-            {trimmedName ? 'No badges. The Pristine one is already gone.' : 'Enter your name to claim a badge.'}
+            {account ? 'No badges. The Pristine one is already gone.' : 'Sign up to claim a badge.'}
           </span>
         )}
       </div>
@@ -386,19 +537,45 @@ function App() {
         <button
           type="button"
           className={page === 'home' ? 'active' : ''}
-          onClick={() => setPage('home')}
+          onClick={() => goToPage('home')}
         >
           Home
         </button>
         <button
           type="button"
           className={page === 'stats' ? 'active' : ''}
-          onClick={() => setPage('stats')}
+          onClick={() => goToPage('stats')}
         >
           Stats
         </button>
+        {account ? (
+          <button type="button" onClick={handleLogOut}>
+            Log out ({account})
+          </button>
+        ) : (
+          <>
+            <button
+              type="button"
+              className={page === 'login' ? 'active' : ''}
+              onClick={() => goToPage('login')}
+            >
+              Log in
+            </button>
+            <button
+              type="button"
+              className={page === 'signup' ? 'active' : ''}
+              onClick={() => goToPage('signup')}
+            >
+              Sign up
+            </button>
+          </>
+        )}
       </nav>
-      {page === 'stats' ? renderStatsPage() : renderHomePage()}
+      {page === 'signup' || page === 'login'
+        ? renderAuthPage(page)
+        : page === 'stats'
+          ? renderStatsPage()
+          : renderHomePage()}
     </div>
   )
 }
