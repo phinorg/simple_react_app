@@ -37,6 +37,28 @@ on first press. Delete it to reset the league, or set `ADMIN_TOKEN` (api) and
 `VITE_ADMIN_TOKEN` (web, build-time) to matching values to enable the Clear
 Stats button — see Configuration below.
 
+## Accounts
+
+Sign up from the nav to claim a name for the Button League. While you are
+signed in, the free-text name box is replaced by your account name, so presses
+always land on the right row.
+
+Accounts live in the browser's `localStorage`, with no server involvement:
+
+- **Per-browser.** They do not follow you to another device, another browser,
+  or a private window, and clearing site data deletes them.
+- **Not security.** Anyone with devtools can read, edit, or delete the store,
+  and the stats API still trusts whatever name it is sent. There is nothing to
+  stop someone posting presses under your name directly.
+- Passwords are PBKDF2-SHA256 hashed (100k iterations, per-account 16-byte
+  salt) rather than stored as typed. That cannot protect the account, but it
+  keeps a reused password out of plain text.
+- Password hashing uses `crypto.subtle`, which requires a secure context. Over
+  plain http on a LAN IP it is unavailable and signup reports so; `localhost`
+  and https are fine.
+
+Treat this as a demo stand-in for real accounts, not a foundation to build on.
+
 ## Running in containers
 
 Two images: `web` (the `nginx:mainline` Debian image serving the built SPA and
