@@ -9,6 +9,23 @@ const __dirname = path.dirname(__filename)
 const dataDir = path.join(__dirname, 'data')
 const statsPath = path.join(dataDir, 'stats.json')
 
+// Matches the mode fs.writeFileSync produced before, so switching to an
+// explicit open() does not silently change stats.json's permissions.
+const STATS_FILE_MODE = 0o644
+
+// Distinguishes concurrent temp files within one process; the pid separates
+// processes.
+let writeSequence = 0
+
+const TEMP_PREFIX = '.stats.'
+const TEMP_SUFFIX = '.tmp'
+
+// Only sweep temp files old enough that no live write could still own one. A
+// real write completes in milliseconds, so anything this stale is an orphan --
+// the guard keeps a starting instance from deleting a sibling's in-flight file
+// when several share the data volume.
+const TEMP_FILE_TTL_MS = 5 * 60 * 1000
+
 const app = express()
 const port = process.env.PORT || 3001
 const adminToken = process.env.ADMIN_TOKEN
@@ -42,13 +59,17 @@ function toSafePlayers(players) {
   return safePlayers
 }
 
-function ensureStatsFile() {
+function ensureDataDir() {
   if (!fs.existsSync(dataDir)) {
     fs.mkdirSync(dataDir, { recursive: true })
   }
+}
+
+function ensureStatsFile() {
+  ensureDataDir()
 
   if (!fs.existsSync(statsPath)) {
-    fs.writeFileSync(statsPath, JSON.stringify(createEmptyStats(), null, 2))
+    writeStats(createEmptyStats())
   }
 }
 
@@ -65,9 +86,77 @@ function readStats() {
   }
 }
 
+// Atomic write. A concurrent reader sees either the previous file or the new
+// one in full, never a half-written one, and a crash mid-write cannot leave a
+// truncated stats.json behind. The temp file is created inside dataDir so the
+// rename stays on a single filesystem, which is where POSIX guarantees it is
+// atomic -- a temp file in /tmp could land on another device and make the
+// rename a non-atomic copy.
 function writeStats(stats) {
-  ensureStatsFile()
-  fs.writeFileSync(statsPath, JSON.stringify(stats, null, 2))
+  ensureDataDir()
+
+  const tempPath = path.join(dataDir, `${TEMP_PREFIX}${process.pid}.${++writeSequence}${TEMP_SUFFIX}`)
+  let handle
+
+  try {
+    // 'wx' fails rather than clobbering, so two writers can never share a temp
+    // file even if the name somehow repeats.
+    handle = fs.openSync(tempPath, 'wx', STATS_FILE_MODE)
+    fs.writeFileSync(handle, JSON.stringify(stats, null, 2))
+    // Flush before the rename: without this the new name can become visible
+    // while its contents are still only in the page cache.
+    fs.fsyncSync(handle)
+    fs.closeSync(handle)
+    handle = undefined
+    fs.renameSync(tempPath, statsPath)
+  } catch (error) {
+    if (handle !== undefined) {
+      try {
+        fs.closeSync(handle)
+      } catch {
+        // Already closed or never opened; the throw below is what matters.
+      }
+    }
+
+    try {
+      fs.unlinkSync(tempPath)
+    } catch {
+      // Nothing to clean up if the open itself failed.
+    }
+
+    throw error
+  }
+}
+
+// A process killed between the write and the rename leaves its temp file
+// behind. stats.json is unharmed -- that is what the rename buys -- but the
+// orphans would pile up in the data volume, so clear the stale ones at startup.
+function sweepStaleTempFiles() {
+  let entries
+
+  try {
+    entries = fs.readdirSync(dataDir)
+  } catch {
+    return // dataDir does not exist yet; ensureStatsFile will create it.
+  }
+
+  const cutoff = Date.now() - TEMP_FILE_TTL_MS
+
+  for (const entry of entries) {
+    if (!entry.startsWith(TEMP_PREFIX) || !entry.endsWith(TEMP_SUFFIX)) {
+      continue
+    }
+
+    const tempPath = path.join(dataDir, entry)
+
+    try {
+      if (fs.statSync(tempPath).mtimeMs < cutoff) {
+        fs.unlinkSync(tempPath)
+      }
+    } catch {
+      // Raced with another instance's sweep, or already gone. Either is fine.
+    }
+  }
 }
 
 function normalizeName(name) {
@@ -142,6 +231,8 @@ app.post('/api/stats/clear', requireAdminToken, (_request, response) => {
   writeStats(createEmptyStats())
   response.json({ players: [] })
 })
+
+sweepStaleTempFiles()
 
 app.listen(port, () => {
   console.log(`Stats server listening on http://localhost:${port}`)
