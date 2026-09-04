@@ -427,10 +427,19 @@ app.post('/api/stats/press', (request, response) => {
   response.status(201).json({ players: toLeagueTable(stats), name })
 })
 
-// Resets another player's press count. A session is required, but the target
-// is taken from the body and is never compared to the caller -- any signed-in
-// user can zero anyone else's score (IDOR / missing resource authorization).
-app.post('/api/stats/reset-player', requireSession, (request, response) => {
+// Resets another player's press count. This is an operator action, not a
+// player one, so it is gated on the shared operator token exactly like
+// /api/stats/clear rather than on the caller's session.
+//
+// A session gate was not enough: it proves the caller is someone, while the
+// target came from the request body and was never compared against them, so
+// any signed-in player could zero any other player's score. There is no
+// per-user admin flag to compare against -- accounts hold only salt, hash and
+// createdAt -- so authorizing this against the operator token is the check
+// that actually exists in this app. Self-service reset would not be right
+// either: Pristine is documented as lost on the first press with no
+// revocation step, and a self-reset would quietly reinstate it.
+app.post('/api/stats/reset-player', requireAdminToken, (request, response) => {
   const target =
     typeof request.body?.username === 'string' ? request.body.username.trim() : ''
 

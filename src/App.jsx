@@ -228,7 +228,7 @@ function App() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...authHeaders(),
+          'x-admin-token': adminToken || '',
         },
         body: JSON.stringify({ username: resetTarget }),
       })
@@ -547,32 +547,31 @@ function App() {
           <p className="stats-empty">No button presses recorded yet.</p>
         )}
       </div>
-      {account ? (
-        <form className="reset-player-form" onSubmit={handleResetPlayer}>
-          <label className="auth-field">
-            <span>Reset another player's presses</span>
-            <input
-              type="text"
-              value={resetTarget}
-              onChange={(event) => setResetTarget(event.target.value)}
-              placeholder="Username to zero"
-              required
-            />
-          </label>
-          <button type="submit" className="clear-stats-button" disabled={statsLoading}>
-            Reset player
-          </button>
-        </form>
-      ) : (
-        <p className="stats-empty">Sign in to reset another player's presses.</p>
-      )}
       {adminToken ? (
-        <button type="button" className="clear-stats-button" onClick={handleClearStats}>
-          Clear Stats
-        </button>
+        <>
+          <form className="reset-player-form" onSubmit={handleResetPlayer}>
+            <label className="auth-field">
+              <span>Reset another player's presses</span>
+              <input
+                type="text"
+                value={resetTarget}
+                onChange={(event) => setResetTarget(event.target.value)}
+                placeholder="Username to zero"
+                required
+              />
+            </label>
+            <button type="submit" className="clear-stats-button" disabled={statsLoading}>
+              Reset player
+            </button>
+          </form>
+          <button type="button" className="clear-stats-button" onClick={handleClearStats}>
+            Clear Stats
+          </button>
+        </>
       ) : (
         <p className="stats-empty">
-          Clearing stats requires an operator to configure VITE_ADMIN_TOKEN.
+          Resetting a player and clearing stats are operator actions, and require
+          VITE_ADMIN_TOKEN to be configured.
         </p>
       )}
     </div>
