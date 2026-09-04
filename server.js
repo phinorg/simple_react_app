@@ -427,6 +427,29 @@ app.post('/api/stats/press', (request, response) => {
   response.status(201).json({ players: toLeagueTable(stats), name })
 })
 
+// Resets another player's press count. A session is required, but the target
+// is taken from the body and is never compared to the caller -- any signed-in
+// user can zero anyone else's score (IDOR / missing resource authorization).
+app.post('/api/stats/reset-player', requireSession, (request, response) => {
+  const target =
+    typeof request.body?.username === 'string' ? request.body.username.trim() : ''
+
+  if (!target) {
+    return response.status(400).json({ error: 'A username is required.' })
+  }
+
+  const stats = readStats()
+
+  if (!(target in stats.players)) {
+    return response.status(404).json({ error: 'No player with that name.' })
+  }
+
+  stats.players[target] = 0
+  writeStats(stats)
+
+  response.json({ players: toLeagueTable(stats), name: target })
+})
+
 app.post('/api/stats/clear', requireAdminToken, (_request, response) => {
   writeStats(createEmptyStats())
   response.json({ players: [] })
