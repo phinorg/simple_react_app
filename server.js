@@ -30,6 +30,10 @@ const MIN_PASSWORD_LENGTH = 8
 const MAX_USERNAME_LENGTH = 32
 const RESERVED_USERNAMES = new Set(['anonymous'])
 
+const LOGIN_WINDOW_MS = 15 * 60 * 1000
+const LOGIN_MAX_ATTEMPTS = 10
+const loginAttempts = new Map()
+
 // Distinguishes concurrent temp files within one process; the pid separates
 // processes.
 let writeSequence = 0
@@ -285,6 +289,25 @@ function sessionUsername(request) {
   return sessions.get(readBearerToken(request))?.username || ''
 }
 
+function loginClientKey(request) {
+  return request.ip || request.socket?.remoteAddress || 'unknown'
+}
+
+function allowLoginAttempt(key) {
+  const now = Date.now()
+  const cutoff = now - LOGIN_WINDOW_MS
+  const stamps = (loginAttempts.get(key) || []).filter((stamp) => stamp > cutoff)
+
+  if (stamps.length >= LOGIN_MAX_ATTEMPTS) {
+    loginAttempts.set(key, stamps)
+    return false
+  }
+
+  stamps.push(now)
+  loginAttempts.set(key, stamps)
+  return true
+}
+
 function requireSession(request, response, next) {
   const username = sessionUsername(request)
 
@@ -369,6 +392,11 @@ app.post('/api/auth/signup', async (request, response) => {
 })
 
 app.post('/api/auth/login', async (request, response) => {
+  if (!allowLoginAttempt(loginClientKey(request))) {
+    response.set('Retry-After', String(Math.ceil(LOGIN_WINDOW_MS / 1000)))
+    return response.status(429).json({ error: 'Too many login attempts. Try again later.' })
+  }
+
   const username = typeof request.body?.username === 'string' ? request.body.username.trim() : ''
   const password = typeof request.body?.password === 'string' ? request.body.password : ''
   const account = readUsers()[username]

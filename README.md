@@ -62,8 +62,9 @@ Known limits:
   Accounts themselves persist; you just log in again.
 - **No transport security of its own.** Tokens over plain http are sniffable;
   put it behind https for anything real.
-- **No login rate limiting.** Password guessing is only slowed by the PBKDF2
-  cost.
+- **Login is rate-limited** to 10 attempts per 15 minutes per client address.
+  Missing accounts still run PBKDF2 so a wrong username is not faster than a
+  wrong password.
 - Deleting `data/users.json` deletes every account.
 
 ## Running in containers
