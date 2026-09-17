@@ -26,3 +26,5 @@ data/stats.json
 *.sw?
 
 data/users.json
+
+data/notes.json

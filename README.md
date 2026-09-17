@@ -109,13 +109,29 @@ are pure JavaScript).
 | --- | --- | --- | --- |
 | `API_UPSTREAM` | web | `http://api:3001` | Where nginx forwards `/api/*`; rendered into the config at container start |
 | `PORT` | api | `3001` | Port the Express server listens on |
-| `ADMIN_TOKEN` | api | unset | Shared secret required (as an `x-admin-token` header) to call `POST /api/stats/clear`. Unset disables the endpoint (503). |
+| `ADMIN_TOKEN` | api | unset | Shared secret required (as an `x-admin-token` header) to call `POST /api/stats/clear`, `POST /api/stats/reset-player` and `DELETE /api/garden/notes/:id`. Unset disables those endpoints (503). |
 | `VITE_ADMIN_TOKEN` | web (build-time) | unset | Baked into the SPA bundle at `npm run build` / image build time so the Clear Stats button can send `ADMIN_TOKEN` above. Must match the api service's `ADMIN_TOKEN`. Unset hides the Clear Stats button. Note: because this is a client-bundled value, it is visible to anyone who views the page source — treat it as a demo-grade shared secret, not a real credential, for any public deployment. |
 
 nginx resolves the upstream per request, so the web container starts and serves
 the SPA even when the API is down (`/api/*` returns 502 until it is back).
 `GET /healthz` on the web container and the container `HEALTHCHECK`s report
 readiness.
+
+### Moderating the notes
+
+There is an unlisted page in the app where players leave short notes for each
+other. Nothing links to it, and it is left undocumented here on purpose -- but
+it accepts writing from the public, so whoever runs the deployment should know
+it exists:
+
+- Notes live in `data/notes.json` (gitignored) and wilt seven days after they
+  are written, so nothing posted there outlives the week on its own.
+- A note is at most 280 characters, one per caller every five seconds, and the
+  file holds at most 200 at a time. The author comes from the session token, as
+  a press does, so notes cannot be signed with a name the caller does not hold.
+- To remove one before it wilts, read `data/notes.json` for its id and call
+  `DELETE /api/garden/notes/:id` with the `x-admin-token` header. That is the
+  only moderation there is.
 
 ## Features
 

@@ -10,6 +10,7 @@ const __dirname = path.dirname(__filename)
 const dataDir = path.join(__dirname, 'data')
 const statsPath = path.join(dataDir, 'stats.json')
 const usersPath = path.join(dataDir, 'users.json')
+const notesPath = path.join(dataDir, 'notes.json')
 
 // Matches the mode fs.writeFileSync produced before, so switching to an
 // explicit open() does not silently change stats.json's permissions.
@@ -18,6 +19,10 @@ const STATS_FILE_MODE = 0o644
 // users.json holds password hashes. Nothing but the server needs to read it.
 const USERS_FILE_MODE = 0o600
 
+// notes.json is as public as stats.json: everything in it is on display to
+// anyone who has found the garden.
+const NOTES_FILE_MODE = 0o644
+
 // PBKDF2-HMAC-SHA512 at the iteration count OWASP recommends for it. Node has
 // this built in, so account storage adds no dependency.
 const PBKDF2_ITERATIONS = 210000
@@ -25,6 +30,17 @@ const PBKDF2_DIGEST = 'sha512'
 const PBKDF2_KEY_BYTES = 64
 const SALT_BYTES = 16
 const SESSION_TOKEN_BYTES = 32
+
+// A note wilts a week after it is written. That bounds the file without a
+// cleanup job, keeps the garden feeling like somewhere people passed through
+// recently, and means nothing left here outlives the week on its own.
+const NOTE_TTL_MS = 7 * 24 * 60 * 60 * 1000
+const MAX_NOTE_LENGTH = 280
+// A ceiling under the TTL, so a flood cannot grow the file without bound even
+// inside a single week. Oldest notes fall away first.
+const MAX_NOTES = 200
+const NOTE_COOLDOWN_MS = 5000
+const NOTE_ID_BYTES = 8
 
 const MIN_PASSWORD_LENGTH = 8
 const MAX_USERNAME_LENGTH = 32
@@ -330,6 +346,154 @@ function toLeagueTable(stats) {
     .map(([name, presses]) => ({ name, presses, badges: toBadges(presses) }))
     .sort((left, right) => right.presses - left.presses || left.name.localeCompare(right.name))
 }
+
+// --- The garden -----------------------------------------------------------
+//
+// Notes players leave for each other, behind a page nothing links to. The
+// garden is not part of the league: no note touches a press count, and the
+// league never mentions the garden.
+//
+// A note's author comes from the session, exactly as a press does, so nobody
+// can sign a note with a name they do not hold. Unsigned visitors write as
+// Anonymous.
+
+function toSafeNotes(parsed, now) {
+  if (!Array.isArray(parsed)) {
+    return []
+  }
+
+  const notes = []
+
+  for (const note of parsed) {
+    if (!note || typeof note !== 'object') {
+      continue
+    }
+
+    const { id, author, text, createdAt } = note
+    const written = typeof createdAt === 'string' ? Date.parse(createdAt) : NaN
+
+    if (
+      typeof id !== 'string' ||
+      typeof author !== 'string' ||
+      typeof text !== 'string' ||
+      !Number.isFinite(written) ||
+      now - written >= NOTE_TTL_MS
+    ) {
+      continue
+    }
+
+    notes.push({ id, author, text, createdAt })
+  }
+
+  return notes
+}
+
+// Wilted notes are dropped on the way out rather than swept on a timer, so a
+// note is gone the moment it is a week old whether or not anyone has posted
+// since. The file catches up the next time someone writes.
+function readNotes(now = Date.now()) {
+  try {
+    return toSafeNotes(JSON.parse(fs.readFileSync(notesPath, 'utf8'))?.notes, now)
+  } catch {
+    // Absent until the first note, or unreadable. Either way the garden is empty.
+    return []
+  }
+}
+
+function writeNotes(notes) {
+  writeJsonAtomic(notesPath, { notes }, NOTES_FILE_MODE)
+}
+
+// Control characters would let a note break the log's layout or hide its own
+// text behind a carriage return. Newlines are the only one worth keeping.
+function cleanNoteText(value) {
+  if (typeof value !== 'string') {
+    return ''
+  }
+
+  return value
+    .replace(/\r\n?/g, '\n')
+    .replace(/[^\P{C}\n]/gu, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
+
+// Enough to stop a stuck key or a loop from filling the garden. Keyed by
+// session token where there is one and by address otherwise, so signing out
+// does not reset the clock but a shared address does share it.
+const lastNoteAt = new Map()
+
+function noteCooldownRemaining(key, now) {
+  return Math.max(0, NOTE_COOLDOWN_MS - (now - (lastNoteAt.get(key) || 0)))
+}
+
+function rememberNoteAt(key, now) {
+  for (const [seen, at] of lastNoteAt) {
+    if (now - at >= NOTE_COOLDOWN_MS) {
+      lastNoteAt.delete(seen)
+    }
+  }
+
+  lastNoteAt.set(key, now)
+}
+
+app.get('/api/garden/notes', (_request, response) => {
+  response.json({ notes: readNotes() })
+})
+
+// Read and write happen without an await between them, so within this process
+// two posts cannot interleave and lose each other. Two server processes over
+// one data volume could still race -- the same exposure presses already have,
+// and not worth a lock file for a page nothing links to.
+app.post('/api/garden/notes', (request, response) => {
+  const text = cleanNoteText(request.body?.text)
+
+  if (!text) {
+    return response.status(400).json({ error: 'A note needs something in it.' })
+  }
+
+  if (text.length > MAX_NOTE_LENGTH) {
+    return response.status(400).json({ error: `Notes are at most ${MAX_NOTE_LENGTH} characters.` })
+  }
+
+  const now = Date.now()
+  const key = readBearerToken(request) || request.ip || 'unknown'
+  const waitMs = noteCooldownRemaining(key, now)
+
+  if (waitMs > 0) {
+    return response
+      .status(429)
+      .json({ error: 'The garden is quiet. Give it a moment.', retryInMs: waitMs })
+  }
+
+  const note = {
+    id: crypto.randomBytes(NOTE_ID_BYTES).toString('hex'),
+    author: sessionUsername(request) || 'Anonymous',
+    text,
+    createdAt: new Date(now).toISOString(),
+  }
+
+  const notes = readNotes(now).concat(note).slice(-MAX_NOTES)
+
+  writeNotes(notes)
+  rememberNoteAt(key, now)
+
+  response.status(201).json({ notes, id: note.id })
+})
+
+// Nothing in the garden is moderated, so removing a note is an operator
+// action, gated exactly like clearing the league.
+app.delete('/api/garden/notes/:id', requireAdminToken, (request, response) => {
+  const notes = readNotes()
+  const remaining = notes.filter((note) => note.id !== request.params.id)
+
+  if (remaining.length === notes.length) {
+    return response.status(404).json({ error: 'No note with that id.' })
+  }
+
+  writeNotes(remaining)
+  response.json({ notes: remaining })
+})
 
 app.post('/api/auth/signup', async (request, response) => {
   const username = typeof request.body?.username === 'string' ? request.body.username.trim() : ''
