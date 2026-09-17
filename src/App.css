@@ -1113,63 +1113,266 @@
   transform: scale(1.03);
 }
 
+/* The garden. Nothing of the front page's colour follows you down here: the
+   whole room goes to greys, so the only thing with any life in it is what
+   someone wrote. Every value is a step on one ramp from ink to paper. */
+
+.app-mono {
+  --ink: #0b0b0c;
+  --ink-raised: #141416;
+  --ink-sunk: #08080a;
+  --paper: #f4f4f5;
+  /* Three steps, each one a legible stop on the ramp: 18:1 for what someone
+     wrote, 9:1 for chrome, 5:1 for the quiet labels around it. Nothing here
+     goes under 4.5:1 -- with the colour gone, contrast is the only thing left
+     doing the work. */
+  --paper-dim: rgba(244, 244, 245, 0.72);
+  --paper-faint: rgba(244, 244, 245, 0.5);
+  --rule: rgba(244, 244, 245, 0.14);
+
+  background: linear-gradient(160deg, #121214 0%, #0b0b0c 55%, #151517 100%);
+}
+
+/* The chrome is the app's, not the garden's, so it is toned down here rather
+   than restyled -- green buttons floating over a grey room would give the
+   place away as an afterthought. */
+.app-mono .press-counter {
+  background: var(--ink-raised);
+  color: var(--paper-dim);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+}
+
+.app-mono .page-nav button {
+  background: rgba(244, 244, 245, 0.08);
+  color: var(--paper-dim);
+}
+
+.app-mono .page-nav button:hover {
+  background: rgba(244, 244, 245, 0.16);
+  color: var(--paper);
+}
+
 .garden-page {
-  width: min(560px, 100%);
+  width: min(640px, 100%);
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 2rem;
+  align-items: stretch;
+  gap: 1rem;
 }
 
 .garden-title {
   margin: 0;
   font-family: 'Space Grotesk', sans-serif;
-  font-size: 3rem;
+  font-size: 2.6rem;
   font-weight: 700;
   text-align: center;
-  color: #e8f5ec;
-  text-shadow: 0 0 24px rgba(232, 245, 236, 0.35);
-  letter-spacing: 0.05em;
+  color: var(--paper);
+  letter-spacing: 0.08em;
 }
 
-.garden-card {
-  width: 100%;
+.garden-note {
+  margin: 0;
+  text-align: center;
+  color: var(--paper-faint);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 0.9rem;
+}
+
+.garden-log {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-  padding: 32px 24px;
-  border-radius: 18px;
-  background: rgba(4, 20, 12, 0.45);
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
+  height: min(48vh, 420px);
+  overflow-y: auto;
+  padding: 18px;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  background: var(--ink-sunk);
 }
 
-.garden-text {
-  margin: 0;
-  color: #e8f5ec;
+.garden-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 10px 14px;
+  border-left: 2px solid var(--rule);
+  background: rgba(244, 244, 245, 0.04);
+}
+
+/* With colour gone, a note's week reads as brightness: it starts as white as
+   the text and dims towards the background until it is gone. */
+.garden-entry-fresh {
+  border-left-color: rgba(244, 244, 245, 0.85);
+}
+
+.garden-entry-green {
+  border-left-color: rgba(244, 244, 245, 0.5);
+}
+
+.garden-entry-fading {
+  border-left-color: rgba(244, 244, 245, 0.28);
+  opacity: 0.78;
+}
+
+.garden-entry-wilting {
+  border-left-color: rgba(244, 244, 245, 0.16);
+  opacity: 0.55;
+}
+
+.garden-entry-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
   font-family: 'Space Grotesk', sans-serif;
-  font-size: 1.1rem;
+  font-size: 0.8rem;
+}
+
+.garden-author {
+  color: var(--paper);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.garden-age {
+  color: var(--paper-faint);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The only colour left in the room would be the leaf, so it comes down to the
+   same ramp as everything else. */
+.garden-age span {
+  filter: grayscale(1);
+  opacity: 0.75;
+}
+
+.garden-entry-text {
+  margin: 0;
+  color: var(--paper);
+  font-size: 1rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.garden-empty {
+  margin: auto;
+  max-width: 34ch;
   text-align: center;
-}
-
-.garden-text-quiet {
-  color: rgba(232, 245, 236, 0.6);
+  color: var(--paper-faint);
+  font-family: 'Space Grotesk', sans-serif;
   font-size: 0.95rem;
+  line-height: 1.5;
 }
 
-.garden-exit {
-  border: none;
-  border-radius: 999px;
+/* No red: a failure is said plainly and the rule under it does the pointing. */
+.garden-error {
+  margin: 0;
+  padding: 8px 12px;
+  border-left: 2px solid var(--paper);
+  background: rgba(244, 244, 245, 0.06);
+  color: var(--paper);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 0.9rem;
+}
+
+.garden-composer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.garden-composer-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.garden-composer-label {
+  color: var(--paper-faint);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 0.8rem;
+}
+
+.garden-input {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  background: var(--ink-sunk);
+  color: var(--paper);
+  font-family: inherit;
+  font-size: 1rem;
+  line-height: 1.45;
+  resize: vertical;
+}
+
+.garden-input::placeholder {
+  color: var(--paper-faint);
+}
+
+.garden-input:focus {
+  outline: none;
+  border-color: rgba(244, 244, 245, 0.55);
+}
+
+.garden-composer-row {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.garden-remaining {
+  color: var(--paper-faint);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.garden-remaining-low {
+  color: var(--paper);
+}
+
+.garden-plant {
+  border: 1px solid var(--rule);
+  border-radius: 4px;
   padding: 10px 18px;
-  background: rgba(10, 46, 26, 0.8);
-  color: #fff;
+  background: rgba(244, 244, 245, 0.1);
+  color: var(--paper);
   cursor: pointer;
   font-family: 'Space Grotesk', sans-serif;
   font-size: 1rem;
   font-weight: 700;
-  transition: background 0.2s, transform 0.2s;
+  letter-spacing: 0.02em;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.garden-plant:hover:not(:disabled) {
+  background: rgba(244, 244, 245, 0.18);
+  border-color: rgba(244, 244, 245, 0.4);
+}
+
+.garden-plant:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.garden-exit {
+  align-self: center;
+  border: none;
+  border-radius: 4px;
+  padding: 10px 18px;
+  background: transparent;
+  color: var(--paper-faint);
+  cursor: pointer;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 0.9rem;
+  transition: background 0.2s, color 0.2s;
 }
 
 .garden-exit:hover {
-  background: #134e2a;
-  transform: scale(1.03);
+  background: rgba(244, 244, 245, 0.08);
+  color: var(--paper);
 }

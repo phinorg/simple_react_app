@@ -596,7 +596,9 @@ function App() {
   )
 
   return (
-    <div className="app">
+    // The garden drops the whole room to greys, chrome included, so it reads as
+    // somewhere else rather than as another page of the same app.
+    <div className={`app ${page === 'garden' ? 'app-mono' : ''}`}>
       <div className="press-counter" aria-label={`Button pressed ${pressCount} times`}>
         {pressCount}
       </div>
@@ -643,7 +645,7 @@ function App() {
         : page === 'stats'
           ? renderStatsPage()
           : page === 'garden'
-            ? <GardenPage onLeave={() => goToPage('home')} />
+            ? <GardenPage account={account} onLeave={() => goToPage('home')} />
             : renderHomePage()}
     </div>
   )
