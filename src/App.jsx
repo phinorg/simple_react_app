@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import './App.css'
+import GardenPage from './GardenPage'
+import { isPointInGlyphCentre } from './textGeometry'
 import {
   MIN_PASSWORD_LENGTH,
   authHeaders,
@@ -10,6 +12,12 @@ import {
 } from './auth'
 
 const adminToken = import.meta.env.VITE_ADMIN_TOKEN
+
+const HOME_TITLE = 'Vibe Code Demo'
+// The way through to the garden: the hole in the "o" of "Code". Unmarked on
+// purpose -- no cursor change, no hover, no extra element in the heading --
+// so the title reads as ordinary text to anyone not looking for it.
+const DOORWAY_INDEX = HOME_TITLE.indexOf('Code') + 1
 
 // The button flees the cursor -- but only so many times. If it could dodge
 // forever the press counter and the Button League would be unwinnable, so it
@@ -309,6 +317,14 @@ function App() {
     setPage(nextPage)
   }
 
+  const handleTitleClick = (event) => {
+    const point = { x: event.clientX, y: event.clientY }
+
+    if (isPointInGlyphCentre(event.currentTarget, DOORWAY_INDEX, point)) {
+      goToPage('garden')
+    }
+  }
+
   const handleSignUp = async (event) => {
     event.preventDefault()
 
@@ -418,7 +434,9 @@ function App() {
 
   const renderHomePage = () => (
     <div className="container">
-      <h1 className="demo-title">Vibe Code Demo</h1>
+      <h1 className="demo-title" onClick={handleTitleClick}>
+        {HOME_TITLE}
+      </h1>
       {account ? (
         <div className="name-box name-box-locked">
           <span>Playing as</span>
@@ -578,7 +596,9 @@ function App() {
   )
 
   return (
-    <div className="app">
+    // The garden drops the whole room to greys, chrome included, so it reads as
+    // somewhere else rather than as another page of the same app.
+    <div className={`app ${page === 'garden' ? 'app-mono' : ''}`}>
       <div className="press-counter" aria-label={`Button pressed ${pressCount} times`}>
         {pressCount}
       </div>
@@ -624,7 +644,9 @@ function App() {
         ? renderAuthPage(page)
         : page === 'stats'
           ? renderStatsPage()
-          : renderHomePage()}
+          : page === 'garden'
+            ? <GardenPage account={account} onLeave={() => goToPage('home')} />
+            : renderHomePage()}
     </div>
   )
 }
